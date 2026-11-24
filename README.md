@@ -59,12 +59,33 @@ probs = det.segment_probs(segments)   # [P(content), P(ad), P(self_promo)] per s
 `sponsorsieve serve` starts a small standard-library server, so ad removers can call it in place of an LLM:
 
 ```
-POST /v1/detect  {"segments": [{"start", "end", "text"}], "threshold": 0.5, "self_promo": false}
-             ->  {"ads": [{"start", "end", "score", "kind"}], "segments": [[p_content, p_ad, p_self_promo], ...]}
-GET  /health     {"ok": true, "version": "0.1.0"}
+POST /v1/detect  {"segments": [{"start", "end", "text", "id"?}], "threshold": 0.5, "self_promo": false}
+             ->  {"ads": [{"start", "end", "score", "kind", "segment_ids"?}],
+                  "segments": [[p_content, p_ad, p_self_promo], ...]}
+GET  /health     {"ok": true, "version": "0.1.1"}
 ```
 
+`id` is optional and can be any JSON value, such as your database key. When the segments have one, each ad span lists the ids of the segments it covers in `segment_ids`, so you don't have to map times back to rows yourself. `segments` returns one probability row per input segment, in the order you sent them. You can use it for your own thresholds, or to send only the uncertain parts to an LLM.
+
 It listens on 127.0.0.1 by default. Send the whole episode transcript: the model reads up to about 1000 tokens of context around each sentence.
+
+### Using it from an ad remover
+
+There are two ways to run it:
+
+- **In-process (Python apps):** `pip install sponsorsieve` adds onnxruntime, tokenizers and huggingface_hub, but not torch. The model (151 MB) downloads to the Hugging Face cache the first time `Detector()` is created. Pass a local folder (`Detector("/models/sponsorsieve")`) to ship it with your image or run offline. Create one `Detector` and reuse it: loading takes a couple of seconds, while detection on an hour-long episode takes about 15 s of CPU time.
+- **Sidecar:** run `sponsorsieve serve --host 0.0.0.0` in its own container and call the HTTP API. For example:
+  `docker run -p 8765:8765 python:3.12-slim sh -c "pip install sponsorsieve && sponsorsieve serve --host 0.0.0.0"`
+
+```python
+# In-process, with transcript rows that have id / start_time / end_time / text
+from sponsorsieve import Detector
+
+det = Detector()
+segments = [{"id": r.id, "start": r.start_time, "end": r.end_time, "text": r.text} for r in rows]
+probs = det.segment_probs(segments)        # [[p_content, p_ad, p_self_promo], ...] per row
+ads = det.detect(segments, probs=probs)    # spans with "segment_ids"
+```
 
 ## How well it works
 

@@ -70,7 +70,10 @@ class Detector:
 
     def detect(self, segments: Sequence[dict], threshold: float = 0.5, include_self_promo: bool = False,
                min_length: float = 20.0, max_gap: float = 8.0, probs: list | None = None) -> list[dict]:
-        """Ad spans: [{start, end, score, kind}] in seconds. Pass `probs` from segment_probs() to reuse them."""
+        """Ad spans: [{start, end, score, kind}] in seconds. Pass `probs` from segment_probs() to reuse them.
+
+        If the segments carry an "id" (e.g. a database key), each span also lists the ids of the
+        segments it covers in "segment_ids", so callers can map spans back to their own rows."""
         probs = probs if probs is not None else self.segment_probs(segments)
         segs = list(segments)
         out: list[dict] = []
@@ -80,7 +83,11 @@ class Detector:
         for kind, p in kinds:
             for sp in segments_to_spans(segs, p, threshold=threshold, max_gap=max_gap, min_length=min_length):
                 out.append({**asdict(sp), "kind": kind, "score": round(sp.score, 3)})
-        return sorted(out, key=lambda d: d["start"])
+        out.sort(key=lambda d: d["start"])
+        if any("id" in s for s in segs):
+            for a in out:
+                a["segment_ids"] = [s.get("id") for s in segs if a["start"] <= s["start"] < a["end"]]
+        return out
 
 
 __all__ = ["Detector", "Span"]

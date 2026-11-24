@@ -1,5 +1,5 @@
 """SponsorSieve: a small local model that finds ads and sponsor reads in podcast transcripts."""
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 from .spans import Span  # noqa: E402,F401
 

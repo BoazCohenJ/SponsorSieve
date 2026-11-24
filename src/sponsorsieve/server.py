@@ -1,7 +1,8 @@
 """Tiny HTTP API (standard library only), for podcast ad removers and other tools.
 
-POST /v1/detect   {"segments": [{start, end, text}], "threshold": 0.5, "self_promo": false}
-             ->   {"ads": [{start, end, score, kind}], "segments": [[p_content, p_ad, p_self], ...]}
+POST /v1/detect   {"segments": [{start, end, text, id?}], "threshold": 0.5, "self_promo": false}
+             ->   {"ads": [{start, end, score, kind, segment_ids?}], "segments": [[p_content, p_ad, p_self], ...]}
+                  segment_ids is present when the input segments carry an "id" (any JSON value).
 GET  /health  ->  {"ok": true, "version": "..."}
 """
 from __future__ import annotations
@@ -38,8 +39,8 @@ def serve(detector, host: str = "127.0.0.1", port: int = 8765) -> None:
                 return self._send(413, {"error": "body missing or too large"})
             try:
                 req = json.loads(self.rfile.read(n))
-                segs = [{"start": float(s["start"]), "end": float(s["end"]), "text": str(s["text"])}
-                        for s in req["segments"]]
+                segs = [{"start": float(s["start"]), "end": float(s["end"]), "text": str(s["text"]),
+                         **({"id": s["id"]} if "id" in s else {})} for s in req["segments"]]
                 threshold, self_promo = float(req.get("threshold", 0.5)), bool(req.get("self_promo", False))
             except (ValueError, KeyError, TypeError) as e:
                 return self._send(400, {"error": f"bad request: {e}"})
