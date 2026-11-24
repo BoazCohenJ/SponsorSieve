@@ -24,7 +24,7 @@ sponsorsieve = "sponsorsieve.cli:main"
 Homepage = "https://boazcohenj.github.io/SponsorSieve/"
 Source = "https://github.com/BoazCohenJ/SponsorSieve"
 Model = "https://huggingface.co/Boazcohen/sponsorsieve"
-Demo = "https://huggingface.co/spaces/Boazcohen/sponsorsieve"
+Demo = "https://boazcohenj.github.io/SponsorSieve/demo/"
 
 [build-system]
 requires = ["hatchling"]

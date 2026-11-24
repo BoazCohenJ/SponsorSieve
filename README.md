@@ -18,7 +18,7 @@ $ sponsorsieve detect andy-and-ari.json      # a benchmark episode; truth: 0:58-
 5 ad span(s), 14.2 min
 ```
 
-[Model on Hugging Face](https://huggingface.co/Boazcohen/sponsorsieve) · [Try it in the browser](https://huggingface.co/spaces/Boazcohen/sponsorsieve) · [Website](https://boazcohenj.github.io/SponsorSieve/)
+[Model on Hugging Face](https://huggingface.co/Boazcohen/sponsorsieve) · [Try it in your browser](https://boazcohenj.github.io/SponsorSieve/demo/) · [Website](https://boazcohenj.github.io/SponsorSieve/)
 
 ## Install
 

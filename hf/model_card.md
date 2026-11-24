@@ -17,7 +17,7 @@ tags:
 
 Finds ads and sponsor reads in podcast transcripts. It's a ModernBERT-base fine-tune that tags each token of a transcript as `content`, `ad` or `self_promo`. The int8 ONNX file is 151 MB and covers 20 hours of audio in about 5 minutes of CPU time.
 
-Code, CLI (`detect` / `clean` / `serve`) and the training pipeline: **https://github.com/BoazCohenJ/SponsorSieve** · Demo: https://huggingface.co/spaces/Boazcohen/sponsorsieve
+Code, CLI (`detect` / `clean` / `serve`) and the training pipeline: **https://github.com/BoazCohenJ/SponsorSieve** · Demo (runs in your browser): https://boazcohenj.github.io/SponsorSieve/demo/
 
 ```bash
 pip install "sponsorsieve[audio]"

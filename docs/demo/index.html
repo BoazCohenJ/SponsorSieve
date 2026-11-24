@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SponsorSieve demo: find ads in a podcast transcript, in your browser</title>
+<meta name="description" content="Paste a podcast transcript and SponsorSieve finds the ads, running the 151 MB model locally in your browser.">
+<link rel="icon" type="image/png" href="https://boazcohenj.github.io/SponsorSieve/icon-64.png">
+<meta property="og:title" content="SponsorSieve demo">
+<meta property="og:description" content="Find ads in a podcast transcript with a small model that runs in your browser.">
+<meta property="og:image" content="https://boazcohenj.github.io/SponsorSieve/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root { --bg:#f7f6f2; --surface:#fff; --text:#141311; --muted:#5c574f; --line:#e3e0d8; --ad:#d8452f; --ad-bg:#fbe6e1; --sp:#b7791f; --sp-bg:#fbf0dc; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121110; --surface:#1b1a18; --text:#f1efe9; --muted:#a8a296; --line:#2e2c28; --ad:#ff7a63; --ad-bg:#3a1e18; --sp:#f0b45a; --sp-bg:#362812; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 1.8rem; margin: 0 0 6px; letter-spacing:-0.01em; }
+  .muted { color: var(--muted); }
+  a { color: inherit; }
+  textarea { width:100%; min-height: 260px; padding:12px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--text); font: 14px/1.5 ui-monospace,Consolas,monospace; resize: vertical; }
+  .controls { display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin: 12px 0 20px; }
+  button { padding:10px 18px; border-radius:8px; border:0; background:var(--text); color:var(--bg); font-weight:600; font-size:1rem; cursor:pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  label { display:flex; align-items:center; gap:8px; }
+  #status { min-height: 1.5em; }
+  .seg { padding: 3px 8px; border-radius: 6px; margin: 1px 0; display:flex; gap:10px; }
+  .seg .t { color: var(--muted); font: 13px/1.6 ui-monospace,Consolas,monospace; min-width: 48px; }
+  .seg.ad { background: var(--ad-bg); }
+  .seg.ad .t { color: var(--ad); font-weight:600; }
+  .seg.self_promo { background: var(--sp-bg); }
+  .seg.self_promo .t { color: var(--sp); font-weight:600; }
+  .pill { display:inline-block; padding: 2px 10px; border-radius: 99px; font-size: .9rem; margin-right:6px; }
+  .pill.ad { background: var(--ad-bg); color: var(--ad); } .pill.self_promo { background: var(--sp-bg); color: var(--sp); }
+  #out { background: var(--surface); border:1px solid var(--line); border-radius:10px; padding: 12px; display:none; }
+</style>
+</head>
+<body>
+<main>
+  <h1>SponsorSieve demo</h1>
+  <p class="muted">Paste a podcast transcript and the model finds the ads. It runs entirely in your browser: the 151 MB model downloads once from <a href="https://huggingface.co/Boazcohen/sponsorsieve">Hugging Face</a>, and your text never leaves this page. Plain text (one sentence per line, times estimated) or JSON <code>[{"start", "end", "text"}]</code>. It works best on a whole episode. <a href="https://github.com/BoazCohenJ/SponsorSieve">GitHub</a> · <a href="https://boazcohenj.github.io/SponsorSieve/">About</a></p>
+  <textarea id="text" spellcheck="false"></textarea>
+  <div class="controls">
+    <button id="run" disabled>Loading model…</button>
+    <label>Threshold <input id="th" type="range" min="0.2" max="0.9" step="0.05" value="0.5"> <span id="thv">0.50</span></label>
+    <label><input id="sp" type="checkbox" checked> Also flag self-promotion</label>
+  </div>
+  <div id="status" class="muted"></div>
+  <div id="summary"></div>
+  <div id="out"></div>
+</main>
+<script type="module">
+import * as ort from "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/ort.min.mjs";
+import { AutoTokenizer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.7.1";
+
+const REPO = "Boazcohen/sponsorsieve";
+const MODEL_URL = `https://huggingface.co/${REPO}/resolve/main/model_int8.onnx`;
+const SIZE = 1024, STRIDE = 512, CLS = 50281, SEP = 50282;
+const $ = (id) => document.getElementById(id);
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
+
+const SAMPLE = `Welcome back to Weekend Projects, the show where we try to fix things we probably shouldn't touch.
+I'm Dana, and with me as always is Marcus.
+Hey everybody.
+So this week I finally tried to rebuild the old bike I found at the flea market.
+The one with the rusty chain?
+That one. The chain was so bad I had to soak it in vinegar overnight.
+Did that actually work?
+Kind of. It got the rust off, but then I realized the derailleur was bent too.
+So I watched about four hours of videos on how to straighten a derailleur hanger.
+Four hours. That's commitment.
+Honestly I learned more about bikes this week than in my whole life.
+And the best part is it only cost me twelve dollars in parts.
+Okay, but did you ride it?
+I rode it around the block twice and the seat fell off.
+That's the most Weekend Projects ending possible.
+Before we get into Marcus's disaster of the week, a quick break.
+This episode is brought to you by Northfield Tools.
+If you've ever stripped a screw at eleven at night, you know how much a good screwdriver matters.
+Northfield makes hand tools that are built to last, with a lifetime warranty on every single one.
+Their new forty-piece precision kit comes in a magnetic case and fits in any drawer.
+Right now, listeners get twenty percent off their first order.
+Go to northfieldtools dot com slash weekend and use code WEEKEND at checkout.
+That's northfieldtools dot com slash weekend, code WEEKEND, for twenty percent off.
+Northfield Tools. Fix it right the first time.
+And we're back. Marcus, tell everyone what happened with the shelf.
+So you know I've been wanting floating shelves in the living room for months.
+I bought the brackets, I found the studs, I did everything right.
+Except you didn't.
+Except I used the wrong anchors on the second one, and at two in the morning the whole thing came down.
+With the plants on it?
+With all three plants on it. There was dirt everywhere.
+My cat was not impressed.
+Okay, so the lesson is, always check what your anchors are rated for.
+Yeah. I went back and got the heavy duty ones and it's been fine since.
+Alright, that's our show for this week.
+If you liked this episode, please rate and review us wherever you listen, it really helps new people find the show.
+And if you want to support us directly, we have a Patreon with bonus episodes every month, link in the show notes.
+See you next weekend, and please, check your anchors.`;
+$("text").value = SAMPLE;
+$("th").oninput = () => { $("thv").textContent = Number($("th").value).toFixed(2); };
+
+function toSegments(text) {
+  text = text.trim();
+  if (text.startsWith("[") || text.startsWith("{")) {
+    const d = JSON.parse(text);
+    const segs = Array.isArray(d) ? d : d.segments;
+    return segs.map((s) => ({ start: +s.start, end: +s.end, text: String(s.text) }));
+  }
+  const lines = text.split(/\n+|(?<=[.!?])\s+/).map((l) => l.trim()).filter(Boolean);
+  let t = 0;
+  return lines.map((l) => {
+    const dur = Math.max(1, l.split(/\s+/).length / 2.6);  // about 2.6 words per second
+    const s = { start: +t.toFixed(2), end: +(t + dur).toFixed(2), text: l };
+    t += dur;
+    return s;
+  });
+}
+
+function windowStarts(n, size, stride) {
+  if (n <= size) return [0];
+  const out = [];
+  for (let s = 0; s < n - size; s += stride) out.push(s);
+  out.push(n - size);
+  return out;
+}
+
+// Same steps as sponsorsieve.Detector.segment_probs + spans.segments_to_spans
+async function segmentProbs(tok, session, segs) {
+  const ids = [], owner = [];
+  segs.forEach((s, i) => {
+    const t = tok.encode(" " + s.text.trim(), { add_special_tokens: false });
+    for (const id of t) { ids.push(id); owner.push(i); }
+  });
+  if (!ids.length) return segs.map(() => [1, 0, 0]);
+  const body = SIZE - 2, sums = new Float64Array(ids.length * 3), counts = new Uint16Array(ids.length);
+  for (const s of windowStarts(ids.length, body, STRIDE)) {
+    const w = [CLS, ...ids.slice(s, s + body), SEP];
+    const feeds = {
+      input_ids: new ort.Tensor("int64", BigInt64Array.from(w, BigInt), [1, w.length]),
+      attention_mask: new ort.Tensor("int64", new BigInt64Array(w.length).fill(1n), [1, w.length]),
+    };
+    const logits = (await session.run(feeds)).logits.data;
+    for (let k = 1; k < w.length - 1; k++) {
+      const a = logits[k * 3], b = logits[k * 3 + 1], c = logits[k * 3 + 2], m = Math.max(a, b, c);
+      const ea = Math.exp(a - m), eb = Math.exp(b - m), ec = Math.exp(c - m), z = ea + eb + ec;
+      const i = s + k - 1;
+      sums[i * 3] += ea / z; sums[i * 3 + 1] += eb / z; sums[i * 3 + 2] += ec / z; counts[i]++;
+    }
+  }
+  const seg = segs.map(() => [0, 0, 0]), n = new Uint32Array(segs.length);
+  owner.forEach((o, i) => { for (let j = 0; j < 3; j++) seg[o][j] += sums[i * 3 + j] / counts[i]; n[o]++; });
+  return seg.map((r, i) => (n[i] ? r.map((v) => v / n[i]) : [1, 0, 0]));
+}
+
+function toSpans(segs, p, th, maxGap = 8, minLen = 20, smooth = 1) {
+  const sm = p.map((_, i) => {
+    const lo = Math.max(0, i - smooth), hi = Math.min(p.length, i + smooth + 1);
+    let s = 0; for (let j = lo; j < hi; j++) s += p[j];
+    return s / (hi - lo);
+  });
+  const spans = [];
+  segs.forEach((seg, i) => {
+    if (!(sm[i] >= th || (p[i] >= th && sm[i] >= th * 0.75))) return;
+    const last = spans[spans.length - 1];
+    if (last && seg.start - last.end <= maxGap) { last.end = seg.end; last.ps.push(p[i]); }
+    else spans.push({ start: seg.start, end: seg.end, ps: [p[i]] });
+  });
+  return spans.filter((s) => s.end - s.start >= minLen)
+    .map((s) => ({ start: s.start, end: s.end, score: s.ps.reduce((a, b) => a + b, 0) / s.ps.length }));
+}
+
+const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+let tok, session;
+async function load() {
+  $("status").textContent = "Downloading the model (151 MB, cached after the first visit)…";
+  [tok, session] = await Promise.all([
+    AutoTokenizer.from_pretrained(REPO),
+    ort.InferenceSession.create(MODEL_URL, { executionProviders: ["wasm"] }),
+  ]);
+  $("status").textContent = "Model ready.";
+  $("run").disabled = false; $("run").textContent = "Find ads";
+}
+
+async function run() {
+  let segs;
+  try { segs = toSegments($("text").value); } catch (e) { $("status").textContent = "Could not read the transcript: " + e.message; return; }
+  if (!segs.length) { $("status").textContent = "Paste a transcript first."; return; }
+  $("run").disabled = true; $("status").textContent = "Running…";
+  const t0 = performance.now();
+  const probs = await segmentProbs(tok, session, segs);
+  const th = Number($("th").value);
+  let ads = toSpans(segs, probs.map((r) => r[1]), th).map((a) => ({ ...a, kind: "ad" }));
+  if ($("sp").checked) ads = ads.concat(toSpans(segs, probs.map((r) => r[2]), th).map((a) => ({ ...a, kind: "self_promo" })));
+  ads.sort((a, b) => a.start - b.start);
+  const total = ads.reduce((s, a) => s + a.end - a.start, 0);
+  $("summary").innerHTML = `<p><b>${ads.length} span(s), ${(total / 60).toFixed(1)} min</b> in ${fmt(segs[segs.length - 1].end)} of transcript ` +
+    `<span class="muted">(${((performance.now() - t0) / 1000).toFixed(1)} s)</span><br>` +
+    ads.map((a) => `<span class="pill ${a.kind}">${fmt(a.start)}–${fmt(a.end)} ${a.kind === "ad" ? "ad" : "self-promo"} ${a.score.toFixed(2)}</span>`).join("") + "</p>";
+  $("out").style.display = "block";
+  $("out").innerHTML = segs.map((s) => {
+    const a = ads.find((x) => x.start <= s.start && s.start < x.end);
+    return `<div class="seg ${a ? a.kind : ""}"><span class="t">${fmt(s.start)}</span><span>${esc(s.text)}</span></div>`;
+  }).join("");
+  $("status").textContent = "";
+  $("run").disabled = false;
+  window.__result = ads;  // for automated checks
+}
+$("run").onclick = run;
+load().then(() => { if (location.hash === "#autorun") run(); })
+  .catch((e) => { $("status").textContent = "Could not load the model: " + e.message; });
+</script>
+</body>
+</html>
