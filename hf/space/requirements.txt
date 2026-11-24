@@ -1,0 +1,2 @@
+sponsorsieve[audio]>=0.1.0
+gradio>=5

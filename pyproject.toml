@@ -1,0 +1,67 @@
+[project]
+name = "sponsorsieve"
+version = "0.1.0"
+description = "Small local model that finds ads and sponsor reads in podcast transcripts"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "BoazCohenJ" }]
+requires-python = ">=3.10"
+keywords = ["podcast", "ads", "sponsor", "onnx", "classifier", "self-hosted"]
+dependencies = [
+  "onnxruntime>=1.17",
+  "tokenizers>=0.19",
+  "huggingface_hub>=0.23",
+  "numpy",
+]
+
+[project.optional-dependencies]
+audio = ["faster-whisper>=1.1", "av<19"]  # PyAV 19 breaks faster-whisper 1.2 audio decoding
+
+[project.scripts]
+sponsorsieve = "sponsorsieve.cli:main"
+
+[project.urls]
+Homepage = "https://boazcohenj.github.io/SponsorSieve/"
+Source = "https://github.com/BoazCohenJ/SponsorSieve"
+Model = "https://huggingface.co/Boazcohen/sponsorsieve"
+Demo = "https://huggingface.co/spaces/Boazcohen/sponsorsieve"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sponsorsieve"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/sponsorsieve", "tests", "README.md", "LICENSE", "pyproject.toml"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+train = [
+  "torch==2.7.1",
+  "transformers>=4.48",
+  "datasets",
+  "accelerate",
+  "faster-whisper>=1.1",
+  "nvidia-cublas-cu12",
+  "nvidia-cudnn-cu12==9.*",
+  "feedparser",
+  "requests",
+  "scikit-learn",
+  "onnx",
+  "onnxruntime",
+]
+
+[tool.uv]
+default-groups = ["train"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }

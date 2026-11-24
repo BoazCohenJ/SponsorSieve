@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SponsorSieve: find podcast ads with a small local model</title>
+<meta name="description" content="Open-source 151 MB model that finds ads and sponsor reads in podcast transcripts on a plain CPU. No LLM, no API key. CLI, Python API, HTTP API, and ad cutting with ffmpeg.">
+<link rel="icon" type="image/png" href="icon-64.png">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SponsorSieve: find podcast ads with a small local model">
+<meta property="og:description" content="A 151 MB model that finds sponsor reads in podcasts on CPU. 88% of ads found on a held-out benchmark. No LLM, no API key.">
+<meta property="og:url" content="https://boazcohenj.github.io/SponsorSieve/">
+<meta property="og:image" content="https://boazcohenj.github.io/SponsorSieve/social.png">
+<meta name="twitter:card" content="summary_large_image">
+<style>
+  :root { --bg:#f7f6f2; --surface:#fff; --text:#141311; --muted:#5c574f; --line:#e3e0d8; --ad:#d8452f; --ad-bg:#fbe6e1; --ok:#2f7a4f; --code:#1d1c1a; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#121110; --surface:#1b1a18; --text:#f1efe9; --muted:#a8a296; --line:#2e2c28; --ad:#ff7a63; --ad-bg:#3a1e18; --ok:#6fcf97; --code:#0b0b0a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { font-size: clamp(2rem, 5vw, 3rem); line-height:1.1; margin: 0 0 12px; letter-spacing:-0.02em; }
+  h2 { font-size: 1.4rem; margin: 56px 0 12px; }
+  p.lead { font-size: 1.2rem; color: var(--muted); max-width: 640px; margin: 0 0 28px; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; margin-bottom:36px; }
+  .brand img { width:32px; height:32px; }
+  .btns { display:flex; flex-wrap:wrap; gap:10px; margin-bottom: 40px; }
+  .btn { display:inline-block; padding:10px 16px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--text); text-decoration:none; font-weight:600; }
+  .btn.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
+  pre, code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 0.92em; }
+  pre { background: var(--code); color:#ecebe6; padding: 16px 18px; border-radius: 10px; overflow-x:auto; line-height:1.5; }
+  .muted { color: var(--muted); }
+  .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 12px; margin: 8px 0 0; }
+  .stat { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; }
+  .stat b { display:block; font-size: 1.7rem; letter-spacing:-0.02em; }
+  .stat span { color: var(--muted); font-size: 0.92rem; }
+  .timeline { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:18px; }
+  .bar { position:relative; height: 34px; border-radius:6px; background: var(--line); overflow:hidden; }
+  .bar i { position:absolute; top:0; bottom:0; background: var(--ad); }
+  .bar.truth i { background: var(--ok); }
+  .tl-label { font-size: 0.88rem; color: var(--muted); margin: 10px 0 6px; }
+  .tl-axis { display:flex; justify-content:space-between; font-size:0.8rem; color:var(--muted); margin-top:6px; }
+  table { width:100%; border-collapse: collapse; background:var(--surface); border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:0.95rem; }
+  th, td { text-align:left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  th { font-weight:600; color: var(--muted); font-size: 0.85rem; }
+  td.n { font-variant-numeric: tabular-nums; }
+  tr:last-child td { border-bottom: 0; }
+  .scroll { overflow-x:auto; }
+  ul { padding-left: 20px; }
+  footer { margin-top: 64px; color: var(--muted); font-size: 0.9rem; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><img src="icon-64.png" alt="">SponsorSieve</div>
+  <h1>Find podcast ads with a small model that runs on your CPU.</h1>
+  <p class="lead">SponsorSieve is a 151 MB classifier trained only to spot sponsor reads, network ad breaks and show self-promotion in podcast transcripts. It needs no LLM, API key or GPU.</p>
+  <div class="btns">
+    <a class="btn primary" href="https://github.com/BoazCohenJ/SponsorSieve">GitHub</a>
+    <a class="btn" href="https://huggingface.co/spaces/Boazcohen/sponsorsieve">Try it in the browser</a>
+    <a class="btn" href="https://huggingface.co/Boazcohen/sponsorsieve">Model on Hugging Face</a>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>88%</b><span>of ads found on a held-out benchmark (15 episodes, 58 ads)</span></div>
+    <div class="stat"><b>85%</b><span>of flagged spans are real ads</span></div>
+    <div class="stat"><b>~5 min</b><span>CPU time for 20 hours of transcripts</span></div>
+    <div class="stat"><b>151 MB</b><span>int8 ONNX, no PyTorch needed</span></div>
+  </div>
+
+  <h2>One benchmark episode, ad by ad</h2>
+  <div class="timeline">
+    <div class="tl-label">Human-verified ads</div>
+    <div class="bar truth" id="truth"></div>
+    <div class="tl-label">SponsorSieve</div>
+    <div class="bar" id="pred"></div>
+    <div class="tl-axis"><span>0:00</span><span>25:00</span><span>50:00</span><span>75:08</span></div>
+  </div>
+  <p class="muted">A 75-minute college sports podcast from the MinusPod benchmark. The model never saw this show in training, and it found all 5 ad breaks, most within a few seconds of the human-marked times.</p>
+
+  <h2>Use it</h2>
+<pre>pip install "sponsorsieve[audio]"
+
+sponsorsieve detect episode.mp3               # transcribe locally, list the ads
+sponsorsieve detect transcript.json           # or use a transcript you already have
+sponsorsieve clean episode.mp3 -o clean.mp3   # cut the ads out (needs ffmpeg)
+sponsorsieve serve --port 8765                # HTTP API for ad removers</pre>
+<pre>from sponsorsieve import Detector
+ads = Detector().detect(segments)   # [{"start", "end", "text"}] -&gt; [{"start", "end", "score", "kind"}]</pre>
+  <p>Self-hosted ad removers such as <a href="https://github.com/podly-pure-podcasts/podly_pure_podcasts">podly</a> and <a href="https://github.com/ttlequals0/MinusPod">MinusPod</a> send each transcript to an LLM. <code>sponsorsieve serve</code> offers the same job behind a small local HTTP endpoint, so those tools can call it in place of the LLM.</p>
+
+  <h2>How well it works</h2>
+  <div class="scroll">
+  <table>
+    <tr><th></th><th>Ads found</th><th>Precision</th><th>F1</th><th>Needs</th></tr>
+    <tr><td><b>SponsorSieve int8</b></td><td class="n">0.879</td><td class="n">0.850</td><td class="n">0.864</td><td>CPU, 151 MB</td></tr>
+    <tr><td>SponsorSieve fp32</td><td class="n">0.879</td><td class="n">0.864</td><td class="n">0.872</td><td>CPU, 599 MB</td></tr>
+    <tr><td>Qwen 3.5 9B labeler (its teacher)</td><td class="n">0.948</td><td class="n">0.873</td><td class="n">0.909</td><td>GPU</td></tr>
+  </table>
+  </div>
+  <p class="muted">Measured on the <a href="https://github.com/ttlequals0/MinusPod">MinusPod benchmark corpus</a>: 15 real episodes, 20.4 hours, 58 human-verified ads, and no show from it used in training. An ad counts as found when predictions cover at least 30% of it. This is the project's own scoring script, not MinusPod's leaderboard metric.</p>
+  <p>Where it slips: on tech-news shows it sometimes flags hosts discussing products, and it misses some short network-inserted spots. English only.</p>
+
+  <h2>How it was made</h2>
+  <ul>
+    <li>283 recent episodes from about 100 popular US podcasts, transcribed with Whisper large-v3-turbo.</li>
+    <li>Ads labeled by a local open-weight LLM (Qwen 3.5 9B) in two passes: find candidate ads, then re-check each one.</li>
+    <li>ModernBERT-base fine-tuned to tag every token as content, ad or self-promo, then exported to ONNX and quantized to int8, which picks the same label as PyTorch on every token tested.</li>
+    <li>No SponsorBlock data was used. The whole pipeline is in the repo.</li>
+  </ul>
+
+  <footer>MIT-licensed code, Apache-2.0 model weights · <a href="https://github.com/BoazCohenJ/SponsorSieve">github.com/BoazCohenJ/SponsorSieve</a></footer>
+</main>
+<script>
+  // andy-and-ari benchmark episode (75:08): truth vs model spans, in seconds
+  const total = 4508;
+  const truth = [[59,305],[650,854],[2081,2216],[2887,3022],[4364,4508]];
+  const pred  = [[59,305],[655,852],[2074,2216],[2910,3014],[4344,4508]];
+  for (const [id, spans] of [["truth", truth], ["pred", pred]]) {
+    const el = document.getElementById(id);
+    for (const [a, b] of spans) {
+      const i = document.createElement("i");
+      i.style.left = (a / total * 100) + "%";
+      i.style.width = ((b - a) / total * 100) + "%";
+      el.appendChild(i);
+    }
+  }
+</script>
+</body>
+</html>
